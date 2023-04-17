@@ -26,7 +26,7 @@
 //
 
 #include "command_line_parser.h"
-constexpr const char* GLOBAL_OPTION_GROUP = "";
+#include "constants.h"
 
 #ifdef _WIN32
 int optind = 1;
@@ -153,7 +153,6 @@ ParseOption(const std::string& arg)
 
 // Condition here merely to avoid compilation error, this function will
 // be defined but not used otherwise.
-#ifdef TRITON_ENABLE_LOGGING
 int
 ParseIntBoolOption(std::string arg)
 {
@@ -170,7 +169,6 @@ ParseIntBoolOption(std::string arg)
 
   return ParseOption<int>(arg);
 }
-#endif  // TRITON_ENABLE_LOGGING
 
 std::string
 PairsToJsonStr(std::vector<std::pair<std::string, std::string>> settings)
@@ -237,29 +235,24 @@ SplitOptions(std::string options, const std::string& delim_str)
 
 enum TritonOptionId {
   OPTION_HELP = 1000,
-#ifdef TRITON_ENABLE_LOGGING
   OPTION_LOG_VERBOSE,
   OPTION_LOG_INFO,
   OPTION_LOG_WARNING,
   OPTION_LOG_ERROR,
   OPTION_LOG_FORMAT,
   OPTION_LOG_FILE,
-#endif  // TRITON_ENABLE_LOGGING
   OPTION_ID,
   OPTION_MODEL_REPOSITORY,
   OPTION_EXIT_ON_ERROR,
   OPTION_DISABLE_AUTO_COMPLETE_CONFIG,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
-#if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_HEADER_FORWARD_PATTERN,
   OPTION_HTTP_PORT,
   OPTION_REUSE_HTTP_PORT,
   OPTION_HTTP_ADDRESS,
   OPTION_HTTP_THREAD_COUNT,
-#endif  // TRITON_ENABLE_HTTP
-#if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
   OPTION_REUSE_GRPC_PORT,
@@ -279,34 +272,25 @@ enum TritonOptionId {
   OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
   OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
   OPTION_GRPC_RESTRICTED_PROTOCOL,
-#endif  // TRITON_ENABLE_GRPC
-#if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
   OPTION_SAGEMAKER_PORT,
   OPTION_SAGEMAKER_SAFE_PORT_RANGE,
   OPTION_SAGEMAKER_THREAD_COUNT,
-#endif  // TRITON_ENABLE_SAGEMAKER
-#if defined(TRITON_ENABLE_VERTEX_AI)
   OPTION_ALLOW_VERTEX_AI,
   OPTION_VERTEX_AI_PORT,
   OPTION_VERTEX_AI_THREAD_COUNT,
   OPTION_VERTEX_AI_DEFAULT_MODEL,
-#endif  // TRITON_ENABLE_VERTEX_AI
-#ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
   OPTION_ALLOW_CPU_METRICS,
   OPTION_METRICS_PORT,
   OPTION_METRICS_INTERVAL_MS,
   OPTION_METRICS_CONFIG,
-#endif  // TRITON_ENABLE_METRICS
-#ifdef TRITON_ENABLE_TRACING
   OPTION_TRACE_FILEPATH,
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
   OPTION_TRACE_COUNT,
   OPTION_TRACE_LOG_FREQUENCY,
-#endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
   OPTION_STARTUP_MODEL,
@@ -332,6 +316,8 @@ enum TritonOptionId {
 void
 TritonParser::SetupOptions()
 {
+  global_options_ = {{OPTION_HELP, "help", Option::ArgNone, "Print usage"}};
+
   server_options_ = {
       {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
       {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs", Option::ArgInt,
@@ -339,7 +325,29 @@ TritonParser::SetupOptions()
        "finish. After the timeout expires the server exits even if inferences "
        "are still in flight."}};
 
-  global_options_ = {{OPTION_HELP, "help", Option::ArgNone, "Print usage"}};
+  if (ENABLE_LOGGING) {
+    logging_options_ = {
+        {OPTION_LOG_VERBOSE, "log-verbose", Option::ArgInt,
+         "Set verbose logging level. Zero (0) disables verbose logging and "
+         "values >= 1 enable verbose logging."},
+        {OPTION_LOG_INFO, "log-info", Option::ArgBool,
+         "Enable/disable info-level logging."},
+        {OPTION_LOG_WARNING, "log-warning", Option::ArgBool,
+         "Enable/disable warning-level logging."},
+        {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
+         "Enable/disable error-level logging."},
+        {OPTION_LOG_FORMAT, "log-format", Option::ArgStr,
+         "Set the logging format. Options are \"default\" and \"ISO8601\". "
+         "The default is \"default\". For \"default\", the log severity (L) "
+         "and "
+         "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
+         "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
+        {OPTION_LOG_FILE, "log-file", Option::ArgStr,
+         "Set the name of the log output file. If specified, log outputs will "
+         "be "
+         "saved to this file. If not specified, log outputs will stream to the "
+         "console."}};
+  }
 
   model_repo_options_ = {
       {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
@@ -399,213 +407,205 @@ TritonParser::SetupOptions()
        "Whether model namespacing is enable or not. If true, models with the "
        "same name can be served if they are in different namespace."}};
 
-  http_options_ = {
-#if defined(TRITON_ENABLE_HTTP)
-    {OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
-     "Allow the server to listen for HTTP requests."},
-    {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
-     "The port for the server to listen on for HTTP requests."},
-    {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
-     Option::ArgStr,
-     "The regular expression pattern that will be used for forwarding HTTP "
-     "headers as inference request parameters."},
-    {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
-     "Allow multiple servers to listen on the same HTTP port when every "
-     "server has this option set. If you plan to use this option as a way to "
-     "load balance between different Triton servers, the same model "
-     "repository or set of models must be used for every server."},
-    {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
-     "The address for the http server to binds to."},
-    {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
-     "Number of threads handling HTTP requests."}
-#endif  // TRITON_ENABLE_HTTP
-  };
+  if (ENABLE_HTTP) {
+    http_options_ = {
+        {OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
+         "Allow the server to listen for HTTP requests."},
+        {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
+         "The port for the server to listen on for HTTP requests."},
+        {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
+         Option::ArgStr,
+         "The regular expression pattern that will be used for forwarding HTTP "
+         "headers as inference request parameters."},
+        {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
+         "Allow multiple servers to listen on the same HTTP port when every "
+         "server has this option set. If you plan to use this option as a way "
+         "to "
+         "load balance between different Triton servers, the same model "
+         "repository or set of models must be used for every server."},
+        {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
+         "The address for the http server to binds to."},
+        {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
+         "Number of threads handling HTTP requests."}};
+  }
 
-  grpc_options_ = {
-#if defined(TRITON_ENABLE_GRPC)
-    {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
-     "Allow the server to listen for GRPC requests."},
-    {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
-     Option::ArgStr,
-     "The regular expression pattern that will be used for forwarding GRPC "
-     "headers as inference request parameters."},
-    {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
-     "The port for the server to listen on for GRPC requests."},
-    {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
-     "Allow multiple servers to listen on the same GRPC port when every "
-     "server has this option set. If you plan to use this option as a way to "
-     "load balance between different Triton servers, the same model "
-     "repository or set of models must be used for every server."},
-    {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
-     "The address for the grpc server to binds to."},
-    {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE, "grpc-infer-allocation-pool-size",
-     Option::ArgInt,
-     "The maximum number of inference request/response objects that remain "
-     "allocated for reuse. As long as the number of in-flight requests "
-     "doesn't exceed this value there will be no allocation/deallocation of "
-     "request/response objects."},
-    {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
-     "Use SSL authentication for GRPC requests. Default is false."},
-    {OPTION_GRPC_USE_SSL_MUTUAL, "grpc-use-ssl-mutual", Option::ArgBool,
-     "Use mututal SSL authentication for GRPC requests. This option will "
-     "preempt '--grpc-use-ssl' if it is also specified. Default is false."},
-    {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
-     "File holding PEM-encoded server certificate. Ignored unless "
-     "--grpc-use-ssl is true."},
-    {OPTION_GRPC_SERVER_KEY, "grpc-server-key", Option::ArgStr,
-     "File holding PEM-encoded server key. Ignored unless "
-     "--grpc-use-ssl is true."},
-    {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
-     "File holding PEM-encoded root certificate. Ignore unless "
-     "--grpc-use-ssl is false."},
-    {OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
-     "grpc-infer-response-compression-level", Option::ArgStr,
-     "The compression level to be used while returning the infer response to "
-     "the peer. Allowed values are none, low, medium and high. By default, "
-     "compression level is selected as none."},
-    {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time", Option::ArgInt,
-     "The period (in milliseconds) after which a keepalive ping is sent on "
-     "the transport. Default is 7200000 (2 hours)."},
-    {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
-     Option::ArgInt,
-     "The period (in milliseconds) the sender of the keepalive ping waits "
-     "for an acknowledgement. If it does not receive an acknowledgment "
-     "within this time, it will close the connection. "
-     "Default is 20000 (20 seconds)."},
-    {OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
-     "grpc-keepalive-permit-without-calls", Option::ArgBool,
-     "Allows keepalive pings to be sent even if there are no calls in flight "
-     "(0 : false; 1 : true). Default is 0 (false)."},
-    {OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
-     "grpc-http2-max-pings-without-data", Option::ArgInt,
-     "The maximum number of pings that can be sent when there is no "
-     "data/header frame to be sent. gRPC Core will not continue sending "
-     "pings if we run over the limit. Setting it to 0 allows sending pings "
-     "without such a restriction. Default is 2."},
-    {OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
-     "grpc-http2-min-recv-ping-interval-without-data", Option::ArgInt,
-     "If there are no data/header frames being sent on the transport, this "
-     "channel argument on the server side controls the minimum time "
-     "(in milliseconds) that gRPC Core would expect between receiving "
-     "successive pings. If the time between successive pings is less than "
-     "this time, then the ping will be considered a bad ping from the peer. "
-     "Such a ping counts as a ‘ping strike’. Default is 300000 (5 minutes)."},
-    {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
-     Option::ArgInt,
-     "Maximum number of bad pings that the server will tolerate before "
-     "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
-     "0 allows the server to accept any number of bad pings. Default is 2."},
-    {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
-     "<string>:<string>=<string>",
-     "Specify restricted GRPC protocol setting. The format of this "
-     "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
-     "<protocol> is a comma-separated list of protocols to be restricted. "
-     "<key> will be additional header key to be checked when a GRPC request "
-     "is received, and <value> is the value expected to be matched."}
-#endif  // TRITON_ENABLE_GRPC
-  };
+  if (ENABLE_GRPC) {
+    grpc_options_ = {
+        {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
+         "Allow the server to listen for GRPC requests."},
+        {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
+         Option::ArgStr,
+         "The regular expression pattern that will be used for forwarding GRPC "
+         "headers as inference request parameters."},
+        {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
+         "The port for the server to listen on for GRPC requests."},
+        {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
+         "Allow multiple servers to listen on the same GRPC port when every "
+         "server has this option set. If you plan to use this option as a way "
+         "to "
+         "load balance between different Triton servers, the same model "
+         "repository or set of models must be used for every server."},
+        {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
+         "The address for the grpc server to binds to."},
+        {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
+         "grpc-infer-allocation-pool-size", Option::ArgInt,
+         "The maximum number of inference request/response objects that remain "
+         "allocated for reuse. As long as the number of in-flight requests "
+         "doesn't exceed this value there will be no allocation/deallocation "
+         "of "
+         "request/response objects."},
+        {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
+         "Use SSL authentication for GRPC requests. Default is false."},
+        {OPTION_GRPC_USE_SSL_MUTUAL, "grpc-use-ssl-mutual", Option::ArgBool,
+         "Use mututal SSL authentication for GRPC requests. This option will "
+         "preempt '--grpc-use-ssl' if it is also specified. Default is false."},
+        {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
+         "File holding PEM-encoded server certificate. Ignored unless "
+         "--grpc-use-ssl is true."},
+        {OPTION_GRPC_SERVER_KEY, "grpc-server-key", Option::ArgStr,
+         "File holding PEM-encoded server key. Ignored unless "
+         "--grpc-use-ssl is true."},
+        {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
+         "File holding PEM-encoded root certificate. Ignore unless "
+         "--grpc-use-ssl is false."},
+        {OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
+         "grpc-infer-response-compression-level", Option::ArgStr,
+         "The compression level to be used while returning the infer response "
+         "to "
+         "the peer. Allowed values are none, low, medium and high. By default, "
+         "compression level is selected as none."},
+        {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time",
+         Option::ArgInt,
+         "The period (in milliseconds) after which a keepalive ping is sent on "
+         "the transport. Default is 7200000 (2 hours)."},
+        {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
+         Option::ArgInt,
+         "The period (in milliseconds) the sender of the keepalive ping waits "
+         "for an acknowledgement. If it does not receive an acknowledgment "
+         "within this time, it will close the connection. "
+         "Default is 20000 (20 seconds)."},
+        {OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
+         "grpc-keepalive-permit-without-calls", Option::ArgBool,
+         "Allows keepalive pings to be sent even if there are no calls in "
+         "flight "
+         "(0 : false; 1 : true). Default is 0 (false)."},
+        {OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
+         "grpc-http2-max-pings-without-data", Option::ArgInt,
+         "The maximum number of pings that can be sent when there is no "
+         "data/header frame to be sent. gRPC Core will not continue sending "
+         "pings if we run over the limit. Setting it to 0 allows sending pings "
+         "without such a restriction. Default is 2."},
+        {OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
+         "grpc-http2-min-recv-ping-interval-without-data", Option::ArgInt,
+         "If there are no data/header frames being sent on the transport, this "
+         "channel argument on the server side controls the minimum time "
+         "(in milliseconds) that gRPC Core would expect between receiving "
+         "successive pings. If the time between successive pings is less than "
+         "this time, then the ping will be considered a bad ping from the "
+         "peer. "
+         "Such a ping counts as a ‘ping strike’. Default is 300000 (5 "
+         "minutes)."},
+        {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
+         Option::ArgInt,
+         "Maximum number of bad pings that the server will tolerate before "
+         "sending an HTTP2 GOAWAY frame and closing the transport. Setting it "
+         "to "
+         "0 allows the server to accept any number of bad pings. Default is "
+         "2."},
+        {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
+         "<string>:<string>=<string>",
+         "Specify restricted GRPC protocol setting. The format of this "
+         "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
+         "<protocol> is a comma-separated list of protocols to be restricted. "
+         "<key> will be additional header key to be checked when a GRPC "
+         "request "
+         "is received, and <value> is the value expected to be matched."}};
+  }
 
-  logging_options_ = {
-#ifdef TRITON_ENABLE_LOGGING
-      {OPTION_LOG_VERBOSE, "log-verbose", Option::ArgInt,
-       "Set verbose logging level. Zero (0) disables verbose logging and "
-       "values >= 1 enable verbose logging."},
-      {OPTION_LOG_INFO, "log-info", Option::ArgBool,
-       "Enable/disable info-level logging."},
-      {OPTION_LOG_WARNING, "log-warning", Option::ArgBool,
-       "Enable/disable warning-level logging."},
-      {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
-       "Enable/disable error-level logging."},
-      {OPTION_LOG_FORMAT, "log-format", Option::ArgStr,
-       "Set the logging format. Options are \"default\" and \"ISO8601\". "
-       "The default is \"default\". For \"default\", the log severity (L) and "
-       "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
-       "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
-      {OPTION_LOG_FILE, "log-file", Option::ArgStr,
-       "Set the name of the log output file. If specified, log outputs will be "
-       "saved to this file. If not specified, log outputs will stream to the "
-       "console."}
-#endif  // TRITON_ENABLE_LOGGING
-  };
+  if (ENABLE_SAGEMAKER) {
+    sagemaker_options_ = {
+        {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
+         "Allow the server to listen for Sagemaker requests. Default is "
+         "false."},
+        {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
+         "The port for the server to listen on for Sagemaker requests. Default "
+         "is 8080."},
+        {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
+         "<integer>-<integer>",
+         "Set the allowed port range for endpoints other than the SageMaker "
+         "endpoints."},
+        {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count",
+         Option::ArgInt,
+         "Number of threads handling Sagemaker requests. Default is 8."}};
+  }
 
-  sagemaker_options_ = {
-#if defined(TRITON_ENABLE_SAGEMAKER)
-    {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
-     "Allow the server to listen for Sagemaker requests. Default is false."},
-    {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
-     "The port for the server to listen on for Sagemaker requests. Default "
-     "is 8080."},
-    {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
-     "<integer>-<integer>",
-     "Set the allowed port range for endpoints other than the SageMaker "
-     "endpoints."},
-    {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
-     "Number of threads handling Sagemaker requests. Default is 8."}
-#endif  // TRITON_ENABLE_SAGEMAKER
-  };
+  if (ENABLE_VERTEX_AI) {
+    vertex_options_ = {
+        {OPTION_ALLOW_VERTEX_AI, "allow-vertex-ai", Option::ArgBool,
+         "Allow the server to listen for Vertex AI requests. Default is true "
+         "if "
+         "AIP_MODE=PREDICTION, false otherwise."},
+        {OPTION_VERTEX_AI_PORT, "vertex-ai-port", Option::ArgInt,
+         "The port for the server to listen on for Vertex AI requests. Default "
+         "is AIP_HTTP_PORT if set, 8080 otherwise."},
+        {OPTION_VERTEX_AI_THREAD_COUNT, "vertex-ai-thread-count",
+         Option::ArgInt,
+         "Number of threads handling Vertex AI requests. Default is 8."},
+        {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-default-model",
+         Option::ArgStr,
+         "The name of the model to use for single-model inference requests."}};
+  }
 
-  vertex_options_ = {
-#if defined(TRITON_ENABLE_VERTEX_AI)
-    {OPTION_ALLOW_VERTEX_AI, "allow-vertex-ai", Option::ArgBool,
-     "Allow the server to listen for Vertex AI requests. Default is true if "
-     "AIP_MODE=PREDICTION, false otherwise."},
-    {OPTION_VERTEX_AI_PORT, "vertex-ai-port", Option::ArgInt,
-     "The port for the server to listen on for Vertex AI requests. Default "
-     "is AIP_HTTP_PORT if set, 8080 otherwise."},
-    {OPTION_VERTEX_AI_THREAD_COUNT, "vertex-ai-thread-count", Option::ArgInt,
-     "Number of threads handling Vertex AI requests. Default is 8."},
-    {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-default-model", Option::ArgStr,
-     "The name of the model to use for single-model inference requests."}
-#endif  // TRITON_ENABLE_VERTEX_AI
-  };
+  if (ENABLE_METRICS) {
+    metric_options_ = {
+        {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
+         "Allow the server to provide prometheus metrics."},
+        {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics", Option::ArgBool,
+         "Allow the server to provide GPU metrics. Ignored unless "
+         "--allow-metrics is true."},
+        {OPTION_ALLOW_CPU_METRICS, "allow-cpu-metrics", Option::ArgBool,
+         "Allow the server to provide CPU metrics. Ignored unless "
+         "--allow-metrics is true."},
+        {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
+         "The port reporting prometheus metrics."},
+        {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
+         "Metrics will be collected once every <metrics-interval-ms> "
+         "milliseconds. Default is 2000 milliseconds."},
+        {OPTION_METRICS_CONFIG, "metrics-config", "<string>=<string>",
+         "Specify a metrics-specific configuration setting. The format of this "
+         "flag is --metrics-config=<setting>=<value>. It can be specified "
+         "multiple times."}};
+  }
 
-  metric_options_ = {
-#if defined(TRITON_ENABLE_METRICS)
-    {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
-     "Allow the server to provide prometheus metrics."},
-    {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics", Option::ArgBool,
-     "Allow the server to provide GPU metrics. Ignored unless "
-     "--allow-metrics is true."},
-    {OPTION_ALLOW_CPU_METRICS, "allow-cpu-metrics", Option::ArgBool,
-     "Allow the server to provide CPU metrics. Ignored unless "
-     "--allow-metrics is true."},
-    {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
-     "The port reporting prometheus metrics."},
-    {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
-     "Metrics will be collected once every <metrics-interval-ms> "
-     "milliseconds. Default is 2000 milliseconds."},
-    {OPTION_METRICS_CONFIG, "metrics-config", "<string>=<string>",
-     "Specify a metrics-specific configuration setting. The format of this "
-     "flag is --metrics-config=<setting>=<value>. It can be specified "
-     "multiple times."}
-#endif  // TRITON_ENABLE_METRICS
-  };
-
-  tracing_options_ = {
-#ifdef TRITON_ENABLE_TRACING
-      {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
-       "Set the file where trace output will be saved. If --trace-log-frequency"
-       " is also specified, this argument value will be the prefix of the files"
-       " to save the trace output. See --trace-log-frequency for detail."},
-      {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
-       "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
-       "trace timestamps, TENSORS to trace tensors. It may be specified "
-       "multiple times to trace multiple informations. Default is OFF."},
-      {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
-       "Set the trace sampling rate. Default is 1000."},
-      {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
-       "Set the number of traces to be sampled. If the value is -1, the number "
-       "of traces to be sampled will not be limited. Default is -1."},
-      {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
-       "Set the trace log frequency. If the value is 0, Triton will only log "
-       "the trace output to <trace-file> when shutting down. Otherwise, Triton "
-       "will log the trace output to <trace-file>.<idx> when it collects the "
-       "specified number of traces. For example, if the log frequency is 100, "
-       "when Triton collects the 100-th trace, it logs the traces to file "
-       "<trace-file>.0, and when it collects the 200-th trace, it logs the "
-       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."}
-#endif  // TRITON_ENABLE_TRACING
-  };
+  if (ENABLE_TRACING) {
+    tracing_options_ = {
+        {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
+         "Set the file where trace output will be saved. If "
+         "--trace-log-frequency"
+         " is also specified, this argument value will be the prefix of the "
+         "files"
+         " to save the trace output. See --trace-log-frequency for detail."},
+        {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
+         "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
+         "trace timestamps, TENSORS to trace tensors. It may be specified "
+         "multiple times to trace multiple informations. Default is OFF."},
+        {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
+         "Set the trace sampling rate. Default is 1000."},
+        {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
+         "Set the number of traces to be sampled. If the value is -1, the "
+         "number "
+         "of traces to be sampled will not be limited. Default is -1."},
+        {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
+         "Set the trace log frequency. If the value is 0, Triton will only log "
+         "the trace output to <trace-file> when shutting down. Otherwise, "
+         "Triton "
+         "will log the trace output to <trace-file>.<idx> when it collects the "
+         "specified number of traces. For example, if the log frequency is "
+         "100, "
+         "when Triton collects the 100-th trace, it logs the traces to file "
+         "<trace-file>.0, and when it collects the 200-th trace, it logs the "
+         "101-th to the 200-th traces to file <trace-file>.1. Default is 0."}};
+  }
 
   cache_options_ = {
       {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
@@ -711,31 +711,16 @@ void
 TritonParser::SetupOptionGroups()
 {
   SetupOptions();
-
   option_groups_.emplace_back(GLOBAL_OPTION_GROUP, global_options_);
   option_groups_.emplace_back("Server", server_options_);
   option_groups_.emplace_back("Model Repository", model_repo_options_);
-#ifdef TRITON_ENABLE_LOGGING
   option_groups_.emplace_back("Logging", logging_options_);
-#endif  // TRITON_ENABLE_LOGGING
-#if defined(TRITON_ENABLE_HTTP)
   option_groups_.emplace_back("HTTP", http_options_);
-#endif  // TRITON_ENABLE_HTTP
-#if defined(TRITON_ENABLE_GRPC)
   option_groups_.emplace_back("GRPC", grpc_options_);
-#endif  // TRITON_ENABLE_GRPC
-#if defined(TRITON_ENABLE_SAGEMAKER)
   option_groups_.emplace_back("Sagemaker", sagemaker_options_);
-#endif  // TRITON_ENABLE_SAGEMAKER
-#if defined(TRITON_ENABLE_VERTEX_AI)
   option_groups_.emplace_back("Vertex", vertex_options_);
-#endif  // TRITON_ENABLE_VERTEX_AI
-#ifdef TRITON_ENABLE_METRICS
   option_groups_.emplace_back("Metrics", metric_options_);
-#endif  // TRITON_ENABLE_METRICS
-#ifdef TRITON_ENABLE_TRACING
   option_groups_.emplace_back("Tracing", tracing_options_);
-#endif  // TRITON_ENABLE_TRACING
   option_groups_.emplace_back("Backend", backend_options_);
   option_groups_.emplace_back("Repository Agent", repo_agent_options_);
   option_groups_.emplace_back("Response Cache", cache_options_);
@@ -757,11 +742,9 @@ TritonServerParameters::CheckPortCollision()
   std::vector<
       std::tuple<std::string, std::string, int32_t, bool, int32_t, int32_t>>
       ports;
-#ifdef TRITON_ENABLE_HTTP
-  if (allow_http_) {
+  if (ENABLE_HTTP && allow_http_) {
     ports.emplace_back("HTTP", http_address_, http_port_, false, -1, -1);
   }
-#endif  // TRITON_ENABLE_HTTP
 #ifdef TRITON_ENABLE_GRPC
   if (allow_grpc_) {
     ports.emplace_back(
@@ -769,26 +752,20 @@ TritonServerParameters::CheckPortCollision()
         false, -1, -1);
   }
 #endif  // TRITON_ENABLE_GRPC
-#ifdef TRITON_ENABLE_METRICS
-  if (allow_metrics_) {
+  if (ENABLE_METRICS && allow_metrics_) {
     ports.emplace_back(
         "metrics", metrics_address_, metrics_port_, false, -1, -1);
   }
-#endif  // TRITON_ENABLE_METRICS
-#ifdef TRITON_ENABLE_SAGEMAKER
-  if (allow_sagemaker_) {
+  if (ENABLE_SAGEMAKER && allow_sagemaker_) {
     ports.emplace_back(
         "SageMaker", sagemaker_address_, sagemaker_port_,
         sagemaker_safe_range_set_, sagemaker_safe_range_.first,
         sagemaker_safe_range_.second);
   }
-#endif  // TRITON_ENABLE_SAGEMAKER
-#ifdef TRITON_ENABLE_VERTEX_AI
-  if (allow_vertex_ai_) {
+  if (ENABLE_VERTEX_AI && allow_vertex_ai_) {
     ports.emplace_back(
         "Vertex AI", vertex_ai_address_, vertex_ai_port_, false, -1, -1);
   }
-#endif  // TRITON_ENABLE_VERTEX_AI
 
   for (auto curr_it = ports.begin(); curr_it != ports.end(); ++curr_it) {
     // If the current service doesn't specify the allow port range for other
@@ -919,68 +896,69 @@ TritonServerParameters::BuildTritonServerOptions()
           loptions, enable_model_namespacing_),
       "setting model namespacing");
 
-#ifdef TRITON_ENABLE_LOGGING
-  TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file_.c_str());
-  THROW_IF_ERR(
-      ParseException, TRITONSERVER_ServerOptionsSetLogInfo(loptions, log_info_),
-      "setting log info enable");
-  THROW_IF_ERR(
-      ParseException, TRITONSERVER_ServerOptionsSetLogWarn(loptions, log_warn_),
-      "setting log warn enable");
-  THROW_IF_ERR(
-      ParseException,
-      TRITONSERVER_ServerOptionsSetLogError(loptions, log_error_),
-      "setting log error enable");
-  THROW_IF_ERR(
-      ParseException,
-      TRITONSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose_),
-      "setting log verbose level");
-  switch (log_format_) {
-    case triton::common::Logger::Format::kDEFAULT:
-      THROW_IF_ERR(
-          ParseException,
-          TRITONSERVER_ServerOptionsSetLogFormat(
-              loptions, TRITONSERVER_LOG_DEFAULT),
-          "setting log format");
-      break;
-    case triton::common::Logger::Format::kISO8601:
-      THROW_IF_ERR(
-          ParseException,
-          TRITONSERVER_ServerOptionsSetLogFormat(
-              loptions, TRITONSERVER_LOG_ISO8601),
-          "setting log format");
-      break;
-  }
-#endif  // TRITON_ENABLE_LOGGING
-
-#ifdef TRITON_ENABLE_METRICS
-  THROW_IF_ERR(
-      ParseException,
-      TRITONSERVER_ServerOptionsSetMetrics(loptions, allow_metrics_),
-      "setting metrics enable");
-  THROW_IF_ERR(
-      ParseException,
-      TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics_),
-      "setting GPU metrics enable");
-  THROW_IF_ERR(
-      ParseException,
-      TRITONSERVER_ServerOptionsSetCpuMetrics(loptions, allow_cpu_metrics_),
-      "setting CPU metrics enable");
-  THROW_IF_ERR(
-      ParseException,
-      TRITONSERVER_ServerOptionsSetMetricsInterval(
-          loptions, metrics_interval_ms_),
-      "setting metrics interval");
-  for (const auto& mcs : metrics_config_settings_) {
+  if (ENABLE_LOGGING) {
+    TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file_.c_str());
     THROW_IF_ERR(
         ParseException,
-        TRITONSERVER_ServerOptionsSetMetricsConfig(
-            loptions, std::get<0>(mcs).c_str(), std::get<1>(mcs).c_str(),
-            std::get<2>(mcs).c_str()),
-        "setting metrics configuration");
+        TRITONSERVER_ServerOptionsSetLogInfo(loptions, log_info_),
+        "setting log info enable");
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetLogWarn(loptions, log_warn_),
+        "setting log warn enable");
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetLogError(loptions, log_error_),
+        "setting log error enable");
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose_),
+        "setting log verbose level");
+    switch (log_format_) {
+      case triton::common::Logger::Format::kDEFAULT:
+        THROW_IF_ERR(
+            ParseException,
+            TRITONSERVER_ServerOptionsSetLogFormat(
+                loptions, TRITONSERVER_LOG_DEFAULT),
+            "setting log format");
+        break;
+      case triton::common::Logger::Format::kISO8601:
+        THROW_IF_ERR(
+            ParseException,
+            TRITONSERVER_ServerOptionsSetLogFormat(
+                loptions, TRITONSERVER_LOG_ISO8601),
+            "setting log format");
+        break;
+    }
   }
 
-#endif  // TRITON_ENABLE_METRICS
+  if (ENABLE_METRICS) {
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetMetrics(loptions, allow_metrics_),
+        "setting metrics enable");
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics_),
+        "setting GPU metrics enable");
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetCpuMetrics(loptions, allow_cpu_metrics_),
+        "setting CPU metrics enable");
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetMetricsInterval(
+            loptions, metrics_interval_ms_),
+        "setting metrics interval");
+    for (const auto& mcs : metrics_config_settings_) {
+      THROW_IF_ERR(
+          ParseException,
+          TRITONSERVER_ServerOptionsSetMetricsConfig(
+              loptions, std::get<0>(mcs).c_str(), std::get<1>(mcs).c_str(),
+              std::get<2>(mcs).c_str()),
+          "setting metrics configuration");
+    }
+  }
 
   THROW_IF_ERR(
       ParseException,
@@ -1052,35 +1030,27 @@ TritonParser::Parse(int argc, char** argv)
   bool disable_auto_complete_config{false};
   bool cache_size_present{false};
   bool cache_config_present{false};
-#ifdef TRITON_ENABLE_TRACING
   bool explicit_disable_trace{false};
-#endif  // TRITON_ENABLE_TRACING
 
 #ifdef TRITON_ENABLE_GRPC
   triton::server::grpc::Options& lgrpc_options = lparams.grpc_options_;
 #endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRITON_ENABLE_VERTEX_AI
   // Set different default value if specific flag is set
-  {
+  if (ENABLE_VERTEX_AI) {
     auto aip_mode =
         triton::server::GetEnvironmentVariableOrDefault("AIP_MODE", "");
     // Enable Vertex AI service and disable HTTP / GRPC service by default
     // if detecting Vertex AI environment
     if (aip_mode == "PREDICTION") {
       lparams.allow_vertex_ai_ = true;
-#ifdef TRITON_ENABLE_HTTP
       lparams.allow_http_ = false;
-#endif  // TRITON_ENABLE_HTTP
-#ifdef TRITON_ENABLE_GRPC
       lparams.allow_grpc_ = false;
-#endif  // TRITON_ENABLE_GRPC
     }
     auto port = triton::server::GetEnvironmentVariableOrDefault(
         "AIP_HTTP_PORT", "8080");
     lparams.vertex_ai_port_ = ParseOption<int>(port);
   }
-#endif  // TRITON_ENABLE_VERTEX_AI
 
   //
   // Step 2. parse options
@@ -1102,7 +1072,16 @@ TritonParser::Parse(int argc, char** argv)
         // [FIXME] fall through when seeing this, currently consumes all options
         // [FIXME] disable stderr output of `getopt_long`
         throw ParseException();
-#ifdef TRITON_ENABLE_LOGGING
+
+      // Server
+      case OPTION_ID:
+        lparams.server_id_ = optarg;
+        break;
+      case OPTION_EXIT_TIMEOUT_SECS:
+        lparams.exit_timeout_secs_ = ParseOption<int>(optarg);
+        break;
+
+      // Logging
       case OPTION_LOG_VERBOSE:
         lparams.log_verbose_ = ParseIntBoolOption(optarg);
         break;
@@ -1129,11 +1108,8 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_LOG_FILE:
         lparams.log_file_ = optarg;
         break;
-#endif  // TRITON_ENABLE_LOGGING
 
-      case OPTION_ID:
-        lparams.server_id_ = optarg;
-        break;
+      // Model Repository
       case OPTION_MODEL_REPOSITORY:
         lparams.model_repository_paths_.insert(optarg);
         break;
@@ -1153,8 +1129,32 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_STRICT_READINESS:
         lparams.strict_readiness_ = ParseOption<bool>(optarg);
         break;
+      case OPTION_POLL_REPO_SECS:
+        lparams.repository_poll_secs_ = ParseOption<int>(optarg);
+        break;
+      case OPTION_STARTUP_MODEL:
+        lparams.startup_models_.insert(optarg);
+        break;
+      case OPTION_MODEL_CONTROL_MODE: {
+        std::string mode_str(optarg);
+        std::transform(
+            mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
+        if (mode_str == "none") {
+          lparams.control_mode_ = TRITONSERVER_MODEL_CONTROL_NONE;
+        } else if (mode_str == "poll") {
+          lparams.control_mode_ = TRITONSERVER_MODEL_CONTROL_POLL;
+        } else if (mode_str == "explicit") {
+          lparams.control_mode_ = TRITONSERVER_MODEL_CONTROL_EXPLICIT;
+        } else {
+          throw ParseException("invalid argument for --model-control-mode");
+        }
+        break;
+      }
+      case OPTION_MODEL_NAMESPACING:
+        lparams.enable_model_namespacing_ = ParseOption<bool>(optarg);
+        break;
 
-#ifdef TRITON_ENABLE_HTTP
+      // HTTP
       case OPTION_ALLOW_HTTP:
         lparams.allow_http_ = ParseOption<bool>(optarg);
         break;
@@ -1166,9 +1166,7 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
-#ifdef TRITON_ENABLE_METRICS
         lparams.metrics_address_ = optarg;
-#endif  // TRITON_ENABLE_METRICS
         break;
       case OPTION_HTTP_HEADER_FORWARD_PATTERN:
         lparams.http_forward_header_pattern_ = optarg;
@@ -1177,38 +1175,6 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_HTTP_THREAD_COUNT:
         lparams.http_thread_cnt_ = ParseOption<int>(optarg);
         break;
-#endif  // TRITON_ENABLE_HTTP
-
-#ifdef TRITON_ENABLE_SAGEMAKER
-      case OPTION_ALLOW_SAGEMAKER:
-        lparams.allow_sagemaker_ = ParseOption<bool>(optarg);
-        break;
-      case OPTION_SAGEMAKER_PORT:
-        lparams.sagemaker_port_ = ParseOption<int>(optarg);
-        break;
-      case OPTION_SAGEMAKER_SAFE_PORT_RANGE:
-        lparams.sagemaker_safe_range_set_ = true;
-        lparams.sagemaker_safe_range_ = ParsePairOption<int, int>(optarg, "-");
-        break;
-      case OPTION_SAGEMAKER_THREAD_COUNT:
-        lparams.sagemaker_thread_cnt_ = ParseOption<int>(optarg);
-        break;
-#endif  // TRITON_ENABLE_SAGEMAKER
-
-#ifdef TRITON_ENABLE_VERTEX_AI
-      case OPTION_ALLOW_VERTEX_AI:
-        lparams.allow_vertex_ai_ = ParseOption<bool>(optarg);
-        break;
-      case OPTION_VERTEX_AI_PORT:
-        lparams.vertex_ai_port_ = ParseOption<int>(optarg);
-        break;
-      case OPTION_VERTEX_AI_THREAD_COUNT:
-        lparams.vertex_ai_thread_cnt_ = ParseOption<int>(optarg);
-        break;
-      case OPTION_VERTEX_AI_DEFAULT_MODEL:
-        lparams.vertex_ai_default_model_ = optarg;
-        break;
-#endif  // TRITON_ENABLE_VERTEX_AI
 
 #ifdef TRITON_ENABLE_GRPC
       case OPTION_ALLOW_GRPC:
@@ -1302,7 +1268,36 @@ TritonParser::Parse(int argc, char** argv)
         break;
 #endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRITON_ENABLE_METRICS
+      // Sagemaker
+      case OPTION_ALLOW_SAGEMAKER:
+        lparams.allow_sagemaker_ = ParseOption<bool>(optarg);
+        break;
+      case OPTION_SAGEMAKER_PORT:
+        lparams.sagemaker_port_ = ParseOption<int>(optarg);
+        break;
+      case OPTION_SAGEMAKER_SAFE_PORT_RANGE:
+        lparams.sagemaker_safe_range_set_ = true;
+        lparams.sagemaker_safe_range_ = ParsePairOption<int, int>(optarg, "-");
+        break;
+      case OPTION_SAGEMAKER_THREAD_COUNT:
+        lparams.sagemaker_thread_cnt_ = ParseOption<int>(optarg);
+        break;
+
+      // Vertex AI
+      case OPTION_ALLOW_VERTEX_AI:
+        lparams.allow_vertex_ai_ = ParseOption<bool>(optarg);
+        break;
+      case OPTION_VERTEX_AI_PORT:
+        lparams.vertex_ai_port_ = ParseOption<int>(optarg);
+        break;
+      case OPTION_VERTEX_AI_THREAD_COUNT:
+        lparams.vertex_ai_thread_cnt_ = ParseOption<int>(optarg);
+        break;
+      case OPTION_VERTEX_AI_DEFAULT_MODEL:
+        lparams.vertex_ai_default_model_ = optarg;
+        break;
+
+      // Metrics
       case OPTION_ALLOW_METRICS:
         lparams.allow_metrics_ = ParseOption<bool>(optarg);
         break;
@@ -1322,9 +1317,8 @@ TritonParser::Parse(int argc, char** argv)
         lparams.metrics_config_settings_.push_back(
             ParseMetricsConfigOption(optarg));
         break;
-#endif  // TRITON_ENABLE_METRICS
 
-#ifdef TRITON_ENABLE_TRACING
+      // Tracing
       case OPTION_TRACE_FILEPATH:
         lparams.trace_filepath_ = optarg;
         break;
@@ -1345,29 +1339,8 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_LOG_FREQUENCY:
         lparams.trace_log_frequency_ = ParseOption<int>(optarg);
         break;
-#endif  // TRITON_ENABLE_TRACING
 
-      case OPTION_POLL_REPO_SECS:
-        lparams.repository_poll_secs_ = ParseOption<int>(optarg);
-        break;
-      case OPTION_STARTUP_MODEL:
-        lparams.startup_models_.insert(optarg);
-        break;
-      case OPTION_MODEL_CONTROL_MODE: {
-        std::string mode_str(optarg);
-        std::transform(
-            mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
-        if (mode_str == "none") {
-          lparams.control_mode_ = TRITONSERVER_MODEL_CONTROL_NONE;
-        } else if (mode_str == "poll") {
-          lparams.control_mode_ = TRITONSERVER_MODEL_CONTROL_POLL;
-        } else if (mode_str == "explicit") {
-          lparams.control_mode_ = TRITONSERVER_MODEL_CONTROL_EXPLICIT;
-        } else {
-          throw ParseException("invalid argument for --model-control-mode");
-        }
-        break;
-      }
+      // Rate Limiter
       case OPTION_RATE_LIMIT: {
         std::string rate_limit_str(optarg);
         std::transform(
@@ -1399,13 +1372,23 @@ TritonParser::Parse(int argc, char** argv)
         }
         break;
       }
-      case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
-        lparams.pinned_memory_pool_byte_size_ = ParseOption<int64_t>(optarg);
+
+      // Backend
+      case OPTION_BACKEND_DIR:
+        lparams.backend_dir_ = optarg;
         break;
-      case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
-        lparams.cuda_pools_.push_back(
-            ParsePairOption<int, uint64_t>(optarg, ":"));
+      case OPTION_BACKEND_CONFIG:
+        lparams.backend_config_settings_.push_back(
+            ParseBackendConfigOption(optarg));
         break;
+
+      // Repository Agent
+      case OPTION_REPOAGENT_DIR:
+        lparams.repoagent_dir_ = optarg;
+        break;
+
+
+      // Cache
       case OPTION_RESPONSE_CACHE_BYTE_SIZE: {
         cache_size_present = true;
         const auto byte_size = std::to_string(ParseOption<int64_t>(optarg));
@@ -1433,17 +1416,17 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_CACHE_DIR:
         lparams.cache_dir_ = optarg;
         break;
+
+      // Memory/Device Management
+      case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
+        lparams.pinned_memory_pool_byte_size_ = ParseOption<int64_t>(optarg);
+        break;
+      case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
+        lparams.cuda_pools_.push_back(
+            ParsePairOption<int, uint64_t>(optarg, ":"));
+        break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         lparams.min_supported_compute_capability_ = ParseOption<double>(optarg);
-        break;
-      case OPTION_EXIT_TIMEOUT_SECS:
-        lparams.exit_timeout_secs_ = ParseOption<int>(optarg);
-        break;
-      case OPTION_BACKEND_DIR:
-        lparams.backend_dir_ = optarg;
-        break;
-      case OPTION_REPOAGENT_DIR:
-        lparams.repoagent_dir_ = optarg;
         break;
       case OPTION_BUFFER_MANAGER_THREAD_COUNT:
         lparams.buffer_manager_thread_count_ = ParseOption<int>(optarg);
@@ -1451,19 +1434,12 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_MODEL_LOAD_THREAD_COUNT:
         lparams.model_load_thread_count_ = ParseOption<int>(optarg);
         break;
-      case OPTION_BACKEND_CONFIG:
-        lparams.backend_config_settings_.push_back(
-            ParseBackendConfigOption(optarg));
-        break;
       case OPTION_HOST_POLICY:
         lparams.host_policies_.push_back(ParseHostPolicyOption(optarg));
         break;
       case OPTION_MODEL_LOAD_GPU_LIMIT:
         lparams.load_gpu_limit_.emplace(
             ParsePairOption<int, double>(optarg, ":"));
-        break;
-      case OPTION_MODEL_NAMESPACING:
-        lparams.enable_model_namespacing_ = ParseOption<bool>(optarg);
         break;
     }
   }
@@ -1481,29 +1457,27 @@ TritonParser::Parse(int argc, char** argv)
     lparams.repository_poll_secs_ = 0;
   }
 
-#ifdef TRITON_ENABLE_VERTEX_AI
-  // Set default model repository if specific flag is set, postpone the
-  // check to after parsing so we only monitor the default repository if
-  // Vertex service is allowed
-  if (lparams.model_repository_paths_.empty()) {
-    auto aip_storage_uri =
-        triton::server::GetEnvironmentVariableOrDefault("AIP_STORAGE_URI", "");
-    if (!aip_storage_uri.empty()) {
-      lparams.model_repository_paths_.insert(aip_storage_uri);
+  if (ENABLE_VERTEX_AI) {
+    // Set default model repository if specific flag is set, postpone the
+    // check to after parsing so we only monitor the default repository if
+    // Vertex service is allowed
+    if (lparams.model_repository_paths_.empty()) {
+      auto aip_storage_uri = triton::server::GetEnvironmentVariableOrDefault(
+          "AIP_STORAGE_URI", "");
+      if (!aip_storage_uri.empty()) {
+        lparams.model_repository_paths_.insert(aip_storage_uri);
+      }
     }
   }
-#endif  // TRITON_ENABLE_VERTEX_AI
 
-#ifdef TRITON_ENABLE_METRICS
-  lparams.allow_gpu_metrics_ &= lparams.allow_metrics_;
-  lparams.allow_cpu_metrics_ &= lparams.allow_metrics_;
-#endif  // TRITON_ENABLE_METRICS
+  if (ENABLE_METRICS) {
+    lparams.allow_gpu_metrics_ &= lparams.allow_metrics_;
+    lparams.allow_cpu_metrics_ &= lparams.allow_metrics_;
+  }
 
-#ifdef TRITON_ENABLE_TRACING
-  if (explicit_disable_trace) {
+  if (ENABLE_TRACING && explicit_disable_trace) {
     lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
   }
-#endif  // TRITON_ENABLE_TRACING
 
   // Check if there is a conflict between --disable-auto-complete-config
   // and --strict-model-config
@@ -1797,7 +1771,6 @@ TritonParser::ParseGenericConfigOption(
   return {name_string, setting_string, value_string};
 }
 
-#ifdef TRITON_ENABLE_TRACING
 TRITONSERVER_InferenceTraceLevel
 TritonParser::ParseTraceLevelOption(std::string arg)
 {
@@ -1818,6 +1791,5 @@ TritonParser::ParseTraceLevelOption(std::string arg)
 
   throw ParseException("invalid value for trace level option: " + arg);
 }
-#endif  // TRITON_ENABLE_TRACING
 
 }}  // namespace triton::server

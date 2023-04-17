@@ -152,7 +152,7 @@ struct TritonServerParameters {
       std::string, std::vector<std::pair<std::string, std::string>>>
       cache_config_settings_;
 
-#ifdef TRITON_ENABLE_LOGGING
+  // Logging
   bool log_info_{true};
   bool log_warn_{true};
   bool log_error_{true};
@@ -160,19 +160,17 @@ struct TritonServerParameters {
   triton::common::Logger::Format log_format_{
       triton::common::Logger::Format::kDEFAULT};
   std::string log_file_{};
-#endif  // TRITON_ENABLE_LOGGING
 
-#ifdef TRITON_ENABLE_TRACING
+  // Tracing
   std::string trace_filepath_{};
   TRITONSERVER_InferenceTraceLevel trace_level_{
       TRITONSERVER_TRACE_LEVEL_DISABLED};
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
-#endif  // TRITON_ENABLE_TRACING
 
-// The configurations for various endpoints (i.e. HTTP, GRPC and metrics)
-#ifdef TRITON_ENABLE_HTTP
+  // The configurations for various endpoints (i.e. HTTP, GRPC and metrics)
+  // HTTP
   bool allow_http_{true};
   std::string http_address_{"0.0.0.0"};
   int32_t http_port_{8000};
@@ -180,14 +178,13 @@ struct TritonServerParameters {
   std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
-#endif  // TRITON_ENABLE_HTTP
 
-#ifdef TRITON_ENABLE_GRPC
   bool allow_grpc_{true};
+#ifdef TRITON_ENABLE_GRPC
   triton::server::grpc::Options grpc_options_;
 #endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRITON_ENABLE_METRICS
+  // Metrics
   bool allow_metrics_{true};
   // Note that socket address is not part of metrics config,
   // current implementation enforce metric to use the same address as in
@@ -204,9 +201,8 @@ struct TritonServerParameters {
   bool allow_cpu_metrics_{true};
   std::vector<std::tuple<std::string, std::string, std::string>>
       metrics_config_settings_;
-#endif  // TRITON_ENABLE_METRICS
 
-#ifdef TRITON_ENABLE_SAGEMAKER
+  // Sagemaker
   bool allow_sagemaker_{false};
   std::string sagemaker_address_{"0.0.0.0"};
   int32_t sagemaker_port_{8080};
@@ -214,16 +210,14 @@ struct TritonServerParameters {
   std::pair<int32_t, int32_t> sagemaker_safe_range_{-1, -1};
   // The number of threads to initialize for the SageMaker HTTP front-end.
   int sagemaker_thread_cnt_{8};
-#endif  // TRITON_ENABLE_SAGEMAKER
 
-#ifdef TRITON_ENABLE_VERTEX_AI
+  // Vertex
   bool allow_vertex_ai_{false};
   std::string vertex_ai_address_{"0.0.0.0"};
   int32_t vertex_ai_port_{8080};
   // The number of threads to initialize for the Vertex AI HTTP front-end.
   int vertex_ai_thread_cnt_{8};
   std::string vertex_ai_default_model_{};
-#endif  // TRITON_ENABLE_VERTEX_AI
 
   // [FIXME] who should call this function?
   void CheckPortCollision();
@@ -279,9 +273,7 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string>
   ParseGrpcRestrictedProtocolOption(const std::string& arg);
-#ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
-#endif  // TRITON_ENABLE_TRACING
   // Helper function to parse option in
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format
   std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
