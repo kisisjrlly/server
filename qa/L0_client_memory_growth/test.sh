@@ -58,52 +58,68 @@ source ../common/util.sh
 
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
-if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    if [ "$TRITON_PERF_LONG" == 1 ]; then
-        # ~ 12 hours
-        # GRPC cycles are reduced as there is high fluctuation in time spent
-        REPETITION_HTTP_CPP=2220000
-        REPETITION_HTTP_PY=3600000
-        REPETITION_GRPC_CPP=8000000
-        REPETITION_GRPC_PY=1500000
-        EMAIL_SUBJECT="Weekly Long"
-    else
-        # Run the test for each case approximately 1.5 hours
-        # All tests are run cumulatively for 7 hours
-        REPETITION_HTTP_CPP=1300000
-        REPETITION_HTTP_PY=2100000
-        REPETITION_GRPC_CPP=6600000
-        REPETITION_GRPC_PY=1000000
-        EMAIL_SUBJECT="Weekly"
-    fi
-else
-    REPETITION_CPP=100000
-    REPETITION_PY=10000
-    EMAIL_SUBJECT="Nightly"
-fi
+#if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
+#    if [ "$TRITON_PERF_LONG" == 1 ]; then
+#        # ~ 12 hours
+#        # GRPC cycles are reduced as there is high fluctuation in time spent
+#        REPETITION_HTTP_CPP=2220000
+#        REPETITION_HTTP_PY=3600000
+#        REPETITION_GRPC_CPP=8000000
+#        REPETITION_GRPC_PY=1500000
+#        EMAIL_SUBJECT="Weekly Long"
+#    else
+#        # Run the test for each case approximately 1.5 hours
+#        # All tests are run cumulatively for 7 hours
+#        REPETITION_HTTP_CPP=1300000
+#        REPETITION_HTTP_PY=2100000
+#        REPETITION_GRPC_CPP=6600000
+#        REPETITION_GRPC_PY=1000000
+#        EMAIL_SUBJECT="Weekly"
+#    fi
+#else
+#    REPETITION_CPP=100000
+#    REPETITION_PY=10000
+#    EMAIL_SUBJECT="Nightly"
+#fi
 
 mkdir -p $DATADIR/custom_identity_int32/1
 
 RET=0
 
+# DEBUG
+#for PROTOCOL in http grpc; do
+#    for LANG in c++ python; do
 # Run test for both HTTP and GRPC, not re-using client object.
-for PROTOCOL in http grpc; do
-    for LANG in c++ python; do
+REPETITION_HTTP_CPP="${ENV_REPETITION_HTTP_CPP}"
+if [ -z "${ENV_REPETITION_HTTP_CPP}" ]; then
+  REPETITION_HTTP_CPP=1300000
+fi
+REPETITION_CPP="${REPETITION_HTTP_CPP}"
+EMAIL_SUBJECT="[Ryan Debug Test]"
+
+echo "================== DEBUG ======================="
+echo "ENV VAR ENV_REPETITION_HTTP_CPP=${ENV_REPETITION_HTTP_CPP}"
+echo "Using REPETITION_HTTP_CPP=${REPETITION_HTTP_CPP}"
+echo "Using REPETITION_CPP=${REPETITION_CPP}"
+echo "================================================"
+
+for PROTOCOL in http; do
+    for LANG in c++; do
         LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${LANG}.log"
         CLIENT_LOG="./client.${PROTOCOL}.${LANG}.log"
         GRAPH_LOG="./client_memory_growth.${PROTOCOL}.${LANG}.log"
         MASSIF_LOG="./${PROTOCOL}.${LANG}.massif"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
 
-        if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-            if [ $PROTOCOL ==  http ]; then
-                REPETITION_CPP=$REPETITION_HTTP_CPP
-                REPETITION_PY=$REPETITION_HTTP_PY
-            else
-                REPETITION_CPP=$REPETITION_GRPC_CPP
-                REPETITION_PY=$REPETITION_GRPC_PY
-            fi
-        fi
+        #if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
+        #    if [ $PROTOCOL ==  http ]; then
+        #        REPETITION_CPP=$REPETITION_HTTP_CPP
+        #        REPETITION_PY=$REPETITION_HTTP_PY
+        #    else
+        #        REPETITION_CPP=$REPETITION_GRPC_CPP
+        #        REPETITION_PY=$REPETITION_GRPC_PY
+        #    fi
+        #fi
 
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -172,8 +188,8 @@ else
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
-    python client_memory_mail.py "$EMAIL_SUBJECT"
-fi
+#if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
+#    python client_memory_mail.py "$EMAIL_SUBJECT"
+#fi
 
 exit $RET
