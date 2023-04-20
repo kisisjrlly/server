@@ -53,7 +53,7 @@ MASSIF_TEST=../common/check_massif_log.py
 
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1"
 source ../common/util.sh
 
 # Set the number of repetitions in nightly and weekly tests
