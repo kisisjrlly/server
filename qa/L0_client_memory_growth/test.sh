@@ -153,6 +153,9 @@ for PROTOCOL in http; do
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
+            echo "==== Check processes using port 8000 ===="
+            ss -lptn 'sport = :8000' || true
+            lsof -n -i :8000 || true
             echo "==== Server health/live ==="
             curl -s -w "%{http_code}\n" localhost:8000/v2/health/live || true
             curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready || true
