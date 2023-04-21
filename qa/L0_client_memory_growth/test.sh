@@ -154,13 +154,14 @@ for PROTOCOL in http; do
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
             echo "==== Server health/live ==="
-            curl -s -w "%{http_code}\n" localhost:8000/v2/health/live
-            curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready
+            curl -s -w "%{http_code}\n" localhost:8000/v2/health/live || true
+            curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready || true
             echo "==== Model health/live ==="
             model="custom_identity_int32"
-            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/ready
-            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/live
-            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/stats
+            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model} || true
+            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/ready || true
+            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/stats || true
+            curl -s -X POST localhost:8000/v2/repository/index || true
             echo "Time: $(date)"
             echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
             if ps -p $SERVER_PID > /dev/null; then
