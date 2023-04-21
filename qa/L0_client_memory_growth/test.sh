@@ -153,8 +153,16 @@ for PROTOCOL in http; do
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
-            echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
+            echo "==== Server health/live ==="
+            curl -s -w "%{http_code}\n" localhost:8000/v2/health/live
+            curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready
+            echo "==== Model health/live ==="
+            model="custom_identity_int32"
+            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/ready
+            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/live
+            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/stats
             echo "Time: $(date)"
+            echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
             if ps -p $SERVER_PID > /dev/null; then
                echo "Server [$SERVER_PID] is still running!"
             else
