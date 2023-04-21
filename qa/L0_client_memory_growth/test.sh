@@ -92,7 +92,7 @@ RET=0
 # Run test for both HTTP and GRPC, not re-using client object.
 REPETITION_HTTP_CPP="${ENV_REPETITION_HTTP_CPP}"
 if [ -z "${ENV_REPETITION_HTTP_CPP}" ]; then
-  REPETITION_HTTP_CPP=1300000
+  REPETITION_HTTP_CPP=13000000
 fi
 REPETITION_CPP="${REPETITION_HTTP_CPP}"
 EMAIL_SUBJECT="[Ryan Debug Test]"
@@ -141,16 +141,28 @@ for PROTOCOL in http; do
         fi
 
         set +e
+        echo "Time: $(date)"
         SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
         TEST_RETCODE=$?
         TEST_DURATION=$SECONDS
+        echo "Time: $(date)"
         set -e
         if [ ${TEST_RETCODE} -ne 0 ]; then
             cat ${CLIENT_LOG}
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
+            echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
+            echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
+            echo "Time: $(date)"
+            if ps -p $SERVER_PID > /dev/null; then
+               echo "Server [$SERVER_PID] is still running!"
+            else
+               echo "Server [$SERVER_PID] is dead"
+            fi
+            echo "==== [DEBUG] DONE CHECKING IF SERVER STILL ALIVE ===="
         else
+            echo "==== [DEBUG] MEMLEAK TEST PASSED ===="
             python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 echo -e "\n***\n*** Memory leak detected\n***"
@@ -177,8 +189,11 @@ for PROTOCOL in http; do
         fi
 
         # Stop Server
+        echo "==== [DEBUG] Killing Server PID: $SERVER_PID ===="
+        echo "Time: $(date)"
         kill $SERVER_PID
         wait $SERVER_PID
+        echo "==== [DEBUG] DONE Killing Server PID: $SERVER_PID ===="
     done
 done
 
