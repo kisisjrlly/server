@@ -162,6 +162,8 @@ for PROTOCOL in http; do
             curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/ready || true
             curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/stats || true
             curl -s -X POST localhost:8000/v2/repository/index || true
+            echo "==== Metrics ==="
+            curl -s -w "%{http_code}\n" localhost:8002/metrics || true
             echo "Time: $(date)"
             echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
             if ps -p $SERVER_PID > /dev/null; then
