@@ -134,8 +134,9 @@ HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
 void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
-  LOG_VERBOSE(1) << "HTTPServer::Dispatch()";
+  LOG_VERBOSE(1) << "======= HTTPServer::Dispatch() START ================";
   (static_cast<HTTPServer*>(arg))->Handle(req);
+  LOG_VERBOSE(1) << "======= HTTPServer::Dispatch() END ================";
 }
 
 #ifdef TRITON_ENABLE_METRICS
@@ -143,7 +144,7 @@ HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 void
 HTTPMetricsServer::Handle(evhtp_request_t* req)
 {
-  LOG_VERBOSE(1) << "HTTPServer::Handle()";
+  LOG_VERBOSE(1) << "======= HTTPServer::Handle() START ================";
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
@@ -178,6 +179,7 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
   }
 
   evhtp_send_reply(req, res);
+  LOG_VERBOSE(1) << "======= HTTPServer::Handle() END ================";
 }
 
 TRITONSERVER_Error*
