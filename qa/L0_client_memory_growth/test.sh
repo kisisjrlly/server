@@ -144,6 +144,11 @@ for PROTOCOL in http; do
 
         set +e
         echo "Time: $(date)"
+
+        echo "==== Check processes using port 8000 before test fails ===="
+        ss -lptn 'sport = :8000' || true
+        lsof -n -i :8000 || true
+
         SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
         TEST_RETCODE=$?
@@ -155,27 +160,32 @@ for PROTOCOL in http; do
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
-            echo "==== Check processes using port 8000 ===="
-            ss -lptn 'sport = :8000' || true
-            lsof -n -i :8000 || true
-            echo "==== Server health/live ==="
-            curl -s -w "%{http_code}\n" localhost:8000/v2/health/live || true
-            curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready || true
-            echo "==== Model health/live ==="
-            model="custom_identity_int32"
-            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model} || true
-            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/ready || true
-            curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/stats || true
-            curl -s -X POST localhost:8000/v2/repository/index || true
-            echo "==== Metrics ==="
-            curl -s -w "%{http_code}\n" localhost:8002/metrics || true
-            echo "Time: $(date)"
-            echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
-            if ps -p $SERVER_PID > /dev/null; then
-               echo "Server [$SERVER_PID] is still running!"
-            else
-               echo "Server [$SERVER_PID] is dead"
-            fi
+            for i in $(seq 1 10); do
+                echo "==== Check processes using port 8000 after test fails ===="
+                ss -lptn 'sport = :8000' || true
+                lsof -n -i :8000 || true
+                echo "==== Server health/live ==="
+                curl -s -w "%{http_code}\n" localhost:8000/v2/health/live || true
+                curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready || true
+                echo "==== Model health/live ==="
+                model="custom_identity_int32"
+                curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model} || true
+                curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/ready || true
+                curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model}/stats || true
+                curl -s -w "%{http_code}\n" -X POST localhost:8000/v2/repository/index || true
+                echo "==== Metrics ==="
+                curl -s -w "%{http_code}\n" localhost:8002/metrics || true
+                echo "Time: $(date)"
+                echo "==== [DEBUG] CHECKING IF SERVER STILL ALIVE ===="
+                if ps -p $SERVER_PID > /dev/null; then
+                   echo "Server [$SERVER_PID] is still running!"
+                else
+                   echo "Server [$SERVER_PID] is dead"
+                fi
+
+                # Sleep to see if server comes back
+                sleep 10
+            done
             echo "==== [DEBUG] DONE CHECKING IF SERVER STILL ALIVE ===="
         else
             echo "==== [DEBUG] MEMLEAK TEST PASSED ===="

@@ -69,6 +69,9 @@ TRITONSERVER_Error*
 HTTPServer::Start()
 {
   if (!worker_.joinable()) {
+    // Debug logs for libevhtp
+    event_enable_debug_logging(EVENT_DBG_ALL);
+
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
