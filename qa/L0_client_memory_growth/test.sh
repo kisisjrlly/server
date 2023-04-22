@@ -101,6 +101,8 @@ echo "================== DEBUG ======================="
 echo "ENV VAR ENV_REPETITION_HTTP_CPP=${ENV_REPETITION_HTTP_CPP}"
 echo "Using REPETITION_HTTP_CPP=${REPETITION_HTTP_CPP}"
 echo "Using REPETITION_CPP=${REPETITION_CPP}"
+apt update -y || true
+apt install -y lsof || true
 echo "================================================"
 
 for PROTOCOL in http; do
