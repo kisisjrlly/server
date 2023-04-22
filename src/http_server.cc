@@ -101,7 +101,9 @@ HTTPServer::Start()
 TRITONSERVER_Error*
 HTTPServer::Stop()
 {
+  LOG_VERBOSE(1) << "HTTPServer::Stop()";
   if (worker_.joinable()) {
+    LOG_VERBOSE(1) << "HTTPServer::Stop() :: worker is joinable";
     // Notify event loop to break via fd write
     send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
     worker_.join();
@@ -121,6 +123,7 @@ HTTPServer::Stop()
 void
 HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
 {
+  LOG_VERBOSE(1) << "HTTPServer::StopCallback()";
   struct event_base* base = (struct event_base*)arg;
   event_base_loopbreak(base);
 }
@@ -128,6 +131,7 @@ HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
 void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
+  LOG_VERBOSE(1) << "HTTPServer::Dispatch()";
   (static_cast<HTTPServer*>(arg))->Handle(req);
 }
 
@@ -136,6 +140,7 @@ HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 void
 HTTPMetricsServer::Handle(evhtp_request_t* req)
 {
+  LOG_VERBOSE(1) << "HTTPServer::Handle()";
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
@@ -178,6 +183,7 @@ HTTPMetricsServer::Create(
     std::string address, const int thread_cnt,
     std::unique_ptr<HTTPServer>* metrics_server)
 {
+  LOG_VERBOSE(1) << "HTTPServer::Create()";
   metrics_server->reset(
       new HTTPMetricsServer(server, port, address, thread_cnt));
 
@@ -197,6 +203,7 @@ namespace {
 TRITONSERVER_Error*
 AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
 {
+  LOG_VERBOSE(1) << "HTTPServer::AllocEvBuffer()";
   evbuffer* evhttp_buffer = evbuffer_new();
   if (evhttp_buffer == nullptr) {
     return TRITONSERVER_ErrorNew(
@@ -251,6 +258,7 @@ TRITONSERVER_Error*
 JsonBytesArrayByteSize(
     triton::common::TritonJson::Value& tensor_data, size_t* byte_size)
 {
+  LOG_VERBOSE(1) << "HTTPServer::JsonBytesArrayByteSize()";
   *byte_size = 0;
 
   for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
@@ -285,6 +293,7 @@ ReadDataFromJsonHelper(
     triton::common::TritonJson::Value& tensor_data, int* counter,
     int64_t expected_cnt)
 {
+  LOG_VERBOSE(1) << "HTTPServer::ReadDataFromJsonHelper()";
   // FIXME should invert loop and switch so don't have to do a switch
   // each iteration.
   for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
@@ -430,6 +439,7 @@ ReadDataFromJson(
     const char* tensor_name, triton::common::TritonJson::Value& tensor_data,
     char* base, const TRITONSERVER_DataType dtype, int64_t expected_cnt)
 {
+  LOG_VERBOSE(1) << "HTTPServer::ReadDataFromJson()";
   int counter = 0;
   switch (dtype) {
     // FP16 not supported via JSON
@@ -482,6 +492,7 @@ WriteDataToJsonCheck(
     const std::string& output_name, const size_t byte_size,
     const size_t expected_size)
 {
+  LOG_VERBOSE(1) << "HTTPServer::WriteDataToJsonCheck()";
   if (byte_size != expected_size) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
@@ -500,6 +511,7 @@ WriteDataToJson(
     const std::string& output_name, const TRITONSERVER_DataType datatype,
     const void* base, const size_t byte_size, const size_t element_count)
 {
+  LOG_VERBOSE(1) << "HTTPServer::WriteDataToJson()";
   switch (datatype) {
     case TRITONSERVER_TYPE_BOOL: {
       const uint8_t* bool_base = reinterpret_cast<const uint8_t*>(base);
@@ -679,6 +691,7 @@ void
 EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
 {
   const char* message = TRITONSERVER_ErrorMessage(err);
+  LOG_VERBOSE(1) << "HTTPServer::EvBufferAddErrorJson(): " << message;
 
   triton::common::TritonJson::Value response(
       triton::common::TritonJson::ValueType::OBJECT);
@@ -695,6 +708,7 @@ CheckBinaryInputData(
     triton::common::TritonJson::Value& request_input, bool* is_binary,
     size_t* byte_size)
 {
+  LOG_VERBOSE(1) << "HTTPServer::CheckBinaryInputData()";
   *is_binary = false;
 
   triton::common::TritonJson::Value params_json;
@@ -715,6 +729,7 @@ TRITONSERVER_Error*
 CheckBinaryOutputData(
     triton::common::TritonJson::Value& request_output, bool* is_binary)
 {
+  LOG_VERBOSE(1) << "HTTPServer::CheckBinaryOutputData()";
   *is_binary = false;
 
   triton::common::TritonJson::Value params_json;
@@ -734,6 +749,7 @@ CheckSharedMemoryData(
     triton::common::TritonJson::Value& request_input, bool* use_shm,
     const char** shm_region, uint64_t* offset, uint64_t* byte_size)
 {
+  LOG_VERBOSE(1) << "HTTPServer::CheckSharedMemoryData()";
   *use_shm = false;
   *offset = 0;
   *byte_size = 0;
@@ -794,6 +810,7 @@ CheckClassificationOutput(
 TRITONSERVER_Error*
 ValidateInputContentType(triton::common::TritonJson::Value& io)
 {
+  LOG_VERBOSE(1) << "HTTPServer::ValidateInputContentType()";
   bool has_data = false;
   bool has_binary = false;
   bool has_shared_memory = false;
@@ -836,6 +853,7 @@ ValidateInputContentType(triton::common::TritonJson::Value& io)
 TRITONSERVER_Error*
 ValidateOutputParameter(triton::common::TritonJson::Value& io)
 {
+  LOG_VERBOSE(1) << "HTTPServer::ValidateOutputParameter()";
   triton::common::TritonJson::Value params_json;
   if (io.Find("parameters", &params_json)) {
     const bool has_shared_memory = params_json.Find("shared_memory_region");
@@ -872,6 +890,7 @@ EVBufferToJson(
     triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
     const size_t length, int n)
 {
+  LOG_VERBOSE(1) << "HTTPServer::EVBufferToJson()";
   size_t offset = 0, remaining_length = length;
   char* json_base;
   std::vector<char> json_buffer;
@@ -1041,6 +1060,7 @@ HTTPAPIServer::InferResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
+  LOG_VERBOSE(1) << "HTTPServer::InferResponseAlloc()";
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   std::unordered_map<std::string, AllocPayload::OutputInfo*>& output_map =
       payload->output_map_;
@@ -1135,6 +1155,7 @@ HTTPAPIServer::OutputBufferAttributes(
     TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
     void* buffer_userp)
 {
+  LOG_VERBOSE(1) << "HTTPServer::OutputBufferAttributes()";
   AllocPayload::OutputInfo* info =
       reinterpret_cast<AllocPayload::OutputInfo*>(buffer_userp);
 
@@ -1158,6 +1179,7 @@ HTTPAPIServer::OutputBufferQuery(
     const char* tensor_name, size_t* byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
+  LOG_VERBOSE(1) << "HTTPServer::OutputBufferQuery()";
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
 
   if (tensor_name != nullptr) {
@@ -1192,6 +1214,7 @@ HTTPAPIServer::InferResponseFree(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
+  LOG_VERBOSE(1) << "HTTPServer::InferResponseFree()";
   LOG_VERBOSE(1) << "HTTP release: "
                  << "size " << byte_size << ", addr " << buffer;
 
@@ -1206,6 +1229,7 @@ HTTPAPIServer::InferResponseFree(
 void
 HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 {
+  LOG_VERBOSE(1) << "HTTPServer::HandleServerHealth()";
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1230,6 +1254,7 @@ void
 HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
+  LOG_VERBOSE(1) << "HTTPServer::HandleRepositoryIndex()";
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1304,6 +1329,7 @@ HTTPAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
     const std::string& model_name, const std::string& action)
 {
+  LOG_VERBOSE(1) << "HTTPServer::HandleRepositoryControl()";
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1465,6 +1491,7 @@ HTTPAPIServer::HandleModelReady(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  LOG_VERBOSE(1) << "HTTPServer::HandleModelReady()";
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1496,6 +1523,7 @@ HTTPAPIServer::HandleModelMetadata(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleModelMetadata()";
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1545,6 +1573,7 @@ HTTPAPIServer::HandleModelConfig(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleModelConfig()";
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1595,6 +1624,7 @@ HTTPAPIServer::HandleModelStats(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleModelStats()";
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1644,6 +1674,7 @@ HTTPAPIServer::HandleModelStats(
 void
 HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleTrace()";
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1835,6 +1866,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 void
 HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleLogging()";
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -1985,6 +2017,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 void
 HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleServerMetadata()";
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -2245,6 +2278,7 @@ TRITONSERVER_Error*
 HTTPAPIServer::GetInferenceHeaderLength(
     evhtp_request_t* req, int32_t content_length, size_t* header_length)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::GetInferenceHeaderLength()";
   // Find Inference-Header-Content-Length in header.
   // Set to content length in case that the header is not specified
   *header_length = content_length;
@@ -2316,6 +2350,7 @@ HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
     evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::EVBufferToInput()";
   // Extract individual input data from HTTP body and register in
   // 'irequest'. The HTTP body is not necessarily stored in contiguous
   // memory.
@@ -2717,6 +2752,7 @@ HTTPAPIServer::EVBufferToRawInput(
     const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
     evbuffer* input_buffer, InferRequestClass* infer_req)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::EVBufferToRawInput()";
   static const char* raw_input_name = "raw_input";
   RETURN_IF_ERR(
       TRITONSERVER_InferenceRequestAddRawInput(irequest, raw_input_name));
@@ -2780,6 +2816,7 @@ struct HeaderSearchPayload {
 int
 ForEachHeader(evhtp_header_t* header, void* arg)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::ForEachHeader()";
   HeaderSearchPayload* header_search_payload =
       reinterpret_cast<HeaderSearchPayload*>(arg);
 
@@ -2805,6 +2842,7 @@ HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::HandleInfer()";
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -2915,6 +2953,7 @@ HTTPAPIServer::HandleInfer(
   const char* request_id = "";
 
   if (err == nullptr) {
+    LOG_VERBOSE(1) << "HTTPAPIServer::HandleInfer() connection_paused=true";
     connection_paused = true;
 
     auto infer_request = CreateInferRequest(req);
@@ -2989,6 +3028,7 @@ HTTPAPIServer::HandleInfer(
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     if (connection_paused) {
+      LOG_VERBOSE(1) << "HTTPAPIServer::HandleInfer() connection_paused=true evhtp_request_resume";
       evhtp_request_resume(req);
     }
     TRITONSERVER_ErrorDelete(err);
@@ -3008,6 +3048,7 @@ HTTPAPIServer::HandleInfer(
 void
 HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::OKReplyCallback()";
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
@@ -3030,6 +3071,7 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 void
 HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::BADReplyCallback()";
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
@@ -3055,6 +3097,7 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::InferRequestClass()";
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
   evhtp_request_pause(req);
@@ -3064,6 +3107,7 @@ void
 HTTPAPIServer::InferRequestClass::InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::InferRequestComplete()";
   // FIXME need to manage the lifetime of InferRequestClass so that we
   // delete it here.
 
@@ -3081,6 +3125,7 @@ void
 HTTPAPIServer::InferRequestClass::InferResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::InferResponseComplete()";
   // FIXME can't use InferRequestClass object here since it's lifetime
   // is different than response. For response we need to know how to
   // send each output (as json, shm, or binary) and that information
@@ -3139,6 +3184,7 @@ TRITONSERVER_Error*
 HTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRITONSERVER_InferenceResponse* response)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::FinalizeResponse()";
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
 
   triton::common::TritonJson::Value response_json(
@@ -3445,6 +3491,7 @@ HTTPAPIServer::InferRequestClass::IncrementResponseCount()
 void
 HTTPAPIServer::Handle(evhtp_request_t* req)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::Handle()";
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
@@ -3546,6 +3593,7 @@ HTTPAPIServer::Create(
     const std::string& header_forward_pattern, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
+  LOG_VERBOSE(1) << "HTTPAPIServer::Create()";
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
       header_forward_pattern, thread_cnt));
