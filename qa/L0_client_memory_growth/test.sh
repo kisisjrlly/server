@@ -164,6 +164,7 @@ for PROTOCOL in http; do
                 echo "==== Check processes using port 8000 after test fails ===="
                 ss -lptn 'sport = :8000' || true
                 lsof -n -i :8000 || true
+                ulimit -n || true
                 echo "==== Server health/live ==="
                 curl -s -w "%{http_code}\n" localhost:8000/v2/health/live || true
                 curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready || true
