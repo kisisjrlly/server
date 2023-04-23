@@ -102,7 +102,7 @@ echo "ENV VAR ENV_REPETITION_HTTP_CPP=${ENV_REPETITION_HTTP_CPP}"
 echo "Using REPETITION_HTTP_CPP=${REPETITION_HTTP_CPP}"
 echo "Using REPETITION_CPP=${REPETITION_CPP}"
 apt update -y || true
-apt install -y lsof || true
+apt install -y lsof traceroute || true
 echo "================================================"
 
 for PROTOCOL in http; do
@@ -148,6 +148,7 @@ for PROTOCOL in http; do
         echo "Time: $(date)"
 
         echo "==== Check processes using port 8000 before test fails ===="
+        traceroute localhost -p 8000 || true
         ss -lptn 'sport = :8000' || true
         lsof -n -i :8000 || true
 
@@ -163,13 +164,15 @@ for PROTOCOL in http; do
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
             for i in $(seq 1 10); do
+                echo "==== Server health/live ==="
+                curl -s -w "%{http_code}\n" --trace - localhost:8000/v2/health/live || true
+                curl -s -w "%{http_code}\n" --trace - localhost:8000/v2/health/ready || true
+
                 echo "==== Check processes using port 8000 after test fails ===="
+                traceroute localhost -p 8000 || true
                 ss -lptn 'sport = :8000' || true
                 lsof -n -i :8000 || true
                 ulimit -n || true
-                echo "==== Server health/live ==="
-                curl -s -w "%{http_code}\n" localhost:8000/v2/health/live || true
-                curl -s -w "%{http_code}\n" localhost:8000/v2/health/ready || true
                 echo "==== Model health/live ==="
                 model="custom_identity_int32"
                 curl -s -w "%{http_code}\n" localhost:8000/v2/models/${model} || true
