@@ -135,7 +135,9 @@ for PROTOCOL in http; do
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
             # NOTE: Add verbose for debugging
-            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL} -v"
+            # NOTE: Add -R to re-use same client repeatedly. Test failure may be
+            # be related to connection limit / open files or something.
+            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL} -v -R"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
