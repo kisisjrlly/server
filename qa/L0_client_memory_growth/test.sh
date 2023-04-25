@@ -146,6 +146,8 @@ for PROTOCOL in http; do
         set +e
         echo "Time: $(date)"
 
+        echo "==== Check ports is use before test fails ===="
+        ss -s || true
         echo "==== Check processes using port 8000 before test fails ===="
         traceroute localhost -p 8000 || true
         ss -lptn 'sport = :8000' || true
@@ -168,6 +170,9 @@ for PROTOCOL in http; do
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
             for i in $(seq 1 10); do
+                echo "==== Check ports is use after test fails ===="
+                ss -s || true
+
                 echo "==== Server health/live ==="
                 curl -s -w "%{http_code}\n" --trace - localhost:8000/v2/health/live || true
                 curl -s -w "%{http_code}\n" --trace - localhost:8000/v2/health/ready || true
