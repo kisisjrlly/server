@@ -102,7 +102,7 @@ echo "ENV VAR ENV_REPETITION_HTTP_CPP=${ENV_REPETITION_HTTP_CPP}"
 echo "Using REPETITION_HTTP_CPP=${REPETITION_HTTP_CPP}"
 echo "Using REPETITION_CPP=${REPETITION_CPP}"
 apt update -y || true
-apt install -y lsof traceroute || true
+apt install -y lsof traceroute net-tools || true
 echo "================================================"
 
 for PROTOCOL in http; do
@@ -151,8 +151,10 @@ for PROTOCOL in http; do
         traceroute localhost -p 8000 || true
         ss -lptn 'sport = :8000' || true
         lsof -n -i :8000 || true
-        echo "==== Check ifconfig before test fails ===="
-        ifconfig
+        echo "==== Check packets before test fails ===="
+        ifconfig || true
+        netstat -i || true
+        netstat -s || true
         echo "===="
 
         SECONDS=0
@@ -175,8 +177,10 @@ for PROTOCOL in http; do
                 traceroute localhost -p 8000 || true
                 ss -lptn 'sport = :8000' || true
                 lsof -n -i :8000 || true
-                echo "==== Check ifconfig after test fails ===="
-                ifconfig
+                echo "==== Check packets after test fails ===="
+                ifconfig || true
+                netstat -i || true
+                netstat -s || true
                 echo "===="
                 ulimit -n || true
                 echo "==== Model health/live ==="
