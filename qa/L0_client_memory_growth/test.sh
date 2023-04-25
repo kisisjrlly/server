@@ -151,6 +151,9 @@ for PROTOCOL in http; do
         traceroute localhost -p 8000 || true
         ss -lptn 'sport = :8000' || true
         lsof -n -i :8000 || true
+        echo "==== Check ifconfig before test fails ===="
+        ifconfig
+        echo "===="
 
         SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
@@ -172,6 +175,9 @@ for PROTOCOL in http; do
                 traceroute localhost -p 8000 || true
                 ss -lptn 'sport = :8000' || true
                 lsof -n -i :8000 || true
+                echo "==== Check ifconfig after test fails ===="
+                ifconfig
+                echo "===="
                 ulimit -n || true
                 echo "==== Model health/live ==="
                 model="custom_identity_int32"
