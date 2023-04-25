@@ -135,9 +135,8 @@ for PROTOCOL in http; do
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
             # NOTE: Add verbose for debugging
-            # NOTE: Add -R to re-use same client repeatedly. Test failure may be
-            # be related to connection limit / open files or something.
-            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL} -v -R"
+            # NOTE: Tried -R to re-use same client repeatedly, still failed
+            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL} -v"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
@@ -164,7 +163,7 @@ for PROTOCOL in http; do
         echo "Time: $(date)"
         set -e
         if [ ${TEST_RETCODE} -ne 0 ]; then
-            cat ${CLIENT_LOG}
+            #cat ${CLIENT_LOG}
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
             echo "==== [DEBUG] MEMLEAK TEST FAILED ===="
