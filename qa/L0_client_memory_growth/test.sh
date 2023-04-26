@@ -136,7 +136,7 @@ for PROTOCOL in http; do
             MAX_ALLOWED_ALLOC="10"
             # NOTE: Add verbose for debugging
             # NOTE: Tried -R to re-use same client repeatedly, still failed
-            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL} -v"
+            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL} -v -R"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
